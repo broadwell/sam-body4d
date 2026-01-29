@@ -32,7 +32,7 @@ from omegaconf import OmegaConf
 from utils import draw_point_marker, mask_painter, images_to_mp4, DAVIS_PALETTE, jpg_folder_to_mp4, is_super_long_or_wide, keep_largest_component, is_skinny_mask, bbox_from_mask, gpu_profile, resize_mask_with_unique_label
 
 from models.sam_3d_body.sam_3d_body import load_sam_3d_body, SAM3DBodyEstimator
-from models.sam_3d_body.notebook.utils import process_image_with_mask, save_mesh_results
+from models.sam_3d_body.notebook.utils import process_image_with_mask, save_mesh_results, visualize_2d_results, setup_visualizer
 from models.sam_3d_body.tools.vis_utils import visualize_sample_together, visualize_sample
 from models.diffusion_vas.demo import init_amodal_segmentation_model, init_rgb_model, init_depth_model, load_and_transform_masks, load_and_transform_rgbs, rgb_to_depth
 
@@ -222,6 +222,9 @@ class OfflineApp:
         For now, just log and return None.
         """
         print("[DEBUG] 4D Generation button clicked.")
+
+        # PMB This probably should be an element of predictor
+        visualizer = setup_visualizer()
 
         IMAGE_PATH = os.path.join(self.OUTPUT_DIR, 'images') # for sam3-3d-body
         MASKS_PATH = os.path.join(self.OUTPUT_DIR, 'masks')  # for sam3-3d-body
@@ -440,12 +443,13 @@ class OfflineApp:
                         idx_ += 1
 
             else:
+                # If no occlusion data
                 for obj_id in self.RUNTIME['out_obj_ids']:
                     occ_dict[obj_id] = [1] * len(batch_masks)
 
             # Process with external mask
             mask_outputs, id_batch, empty_frame_list = process_image_with_mask(self.sam3_3d_body_model, batch_images, batch_masks, idx_path, idx_dict, mhr_shape_scale_dict, occ_dict)
-            
+
             num_empth_ids = 0
             for frame_id in range(len(batch_images)):
                 image_path = batch_images[frame_id]
@@ -470,9 +474,13 @@ class OfflineApp:
                 # It would be nice if the mask were transparent, but whatever
                 masked_img = np.float32(img) * (1 - alpha) + np.float32(rend_img) * alpha
 
+                vis_results = visualize_2d_results(masked_img, mask_output, visualizer)
+                for v, vis_image in enumerate(vis_results):
+                    rgb_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
+
                 cv2.imwrite(
                     f"{self.OUTPUT_DIR}/rendered_frames/{os.path.basename(image_path)[:-4]}.jpg",
-                    masked_img.astype(np.uint8),
+                    rgb_image.astype(np.uint8),
                     #rend_img.astype(np.uint8),
                 )
 
@@ -502,6 +510,8 @@ class OfflineApp:
 def inference(args):
     # init configs and cover with cmd options
     predictor = OfflineApp()
+    visualizer = setup_visualizer()
+
     if args.output_dir is not None:
         predictor.OUTPUT_DIR = args.output_dir
         os.makedirs(predictor.OUTPUT_DIR, exist_ok=True)
@@ -516,7 +526,17 @@ def inference(args):
             outputs = predictor.sam3_3d_body_model.process_one_image(image, bbox_thr=0.6,)
             if len(outputs) > 0:
                 break
-        
+     
+        # PMB 
+        print("Visualizing 2D results of pilot image") 
+        vis_results = visualize_2d_results(image, outputs, visualizer)
+        for v, vis_image in enumerate(vis_results):
+            rgb_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(
+                f"{predictor.OUTPUT_DIR}/frame_{starting_frame_idx}_{v+1}.jpg",
+                rgb_image 
+            )
+ 
         inference_state = predictor.predictor.init_state(video_path=args.input_video)
         predictor.predictor.clear_all_points_in_video(inference_state)
         predictor.RUNTIME['inference_state'] = inference_state
@@ -582,6 +602,9 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, help="Path to the output directory")
     parser.add_argument("--input_video", type=str, required=True, help="Path to the input video (either *.mp4 or a directory containing image sequences)")
     args = parser.parse_args()
+
+    # PMB Would be nice to see skeletons...
+    os.environ["MOMENTUM_ENABLED"] = "1"
 
     input_path = args.input_video
     if not os.path.exists(input_path):
