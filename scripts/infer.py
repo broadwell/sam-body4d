@@ -460,28 +460,27 @@ class OfflineApp:
                 else:
                     mask_output = mask_outputs[frame_id-num_empth_ids]
                     id_current = id_batch[frame_id-num_empth_ids]
+                
                 img = cv2.imread(image_path)
-                rend_img = visualize_sample_together(img, mask_output, self.sam3_3d_body_model.faces, id_current)
-                # PMB Overlay mask on original image
-                gray_mask = cv2.cvtColor(rend_img, cv2.COLOR_BGR2GRAY)
-                _, pose_mask = cv2.threshold(gray_mask, 250, 255, cv2.THRESH_BINARY_INV)
-                alpha = (pose_mask.astype(float) / 255.0)
+               
+                # PMB Overlay 2D skeleton on original image 
+                vis_results = visualize_2d_results(img, mask_output, visualizer)
+                img_rgba = cv2.cvtColor(vis_results[0], cv2.COLOR_RGB2RGBA)
 
-                # Ensure alpha has the same number of channels as the images for correct broadcasting
-                if len(img.shape) == 3 and len(alpha.shape) == 2:
-                    alpha = cv2.cvtColor(alpha.astype(np.uint8), cv2.COLOR_GRAY2BGR)
-
-                # It would be nice if the mask were transparent, but whatever
-                masked_img = np.float32(img) * (1 - alpha) + np.float32(rend_img) * alpha
-
-                vis_results = visualize_2d_results(masked_img, mask_output, visualizer)
-                for v, vis_image in enumerate(vis_results):
-                    rgb_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
-
+                # PMB Overlay mask on annotated image
+                rend_img = visualize_sample_together(img_rgba, mask_output, self.sam3_3d_body_model.faces, id_current)
+                gray_mask = cv2.cvtColor(rend_img, cv2.COLOR_RGBA2GRAY)
+                _, nonpose_mask = cv2.threshold(gray_mask, 254, 255, cv2.THRESH_BINARY)
+                _, pose_mask = cv2.threshold(gray_mask, 254, 255, cv2.THRESH_BINARY_INV)
+                pose_idx = np.nonzero(pose_mask)
+                nonpose_idx = np.nonzero(nonpose_mask)
+               
+                rend_img[nonpose_idx[0], nonpose_idx[1], :] = 0
+                masked_img = cv2.add(np.float32(rend_img), np.float32(img_rgba))
+                
                 cv2.imwrite(
                     f"{self.OUTPUT_DIR}/rendered_frames/{os.path.basename(image_path)[:-4]}.jpg",
-                    rgb_image.astype(np.uint8),
-                    #rend_img.astype(np.uint8),
+                    masked_img,
                 )
 
                 # save rendered frames for individual person
@@ -501,7 +500,9 @@ class OfflineApp:
                     id_current=id_current,
                 )
 
+
         out_4d_path = os.path.join(self.OUTPUT_DIR, f"4d_{time.time():.0f}.mp4")
+
         jpg_folder_to_mp4(f"{self.OUTPUT_DIR}/rendered_frames", out_4d_path)
 
         return out_4d_path
@@ -510,7 +511,6 @@ class OfflineApp:
 def inference(args):
     # init configs and cover with cmd options
     predictor = OfflineApp()
-    visualizer = setup_visualizer()
 
     if args.output_dir is not None:
         predictor.OUTPUT_DIR = args.output_dir
@@ -527,16 +527,6 @@ def inference(args):
             if len(outputs) > 0:
                 break
      
-        # PMB 
-        print("Visualizing 2D results of pilot image") 
-        vis_results = visualize_2d_results(image, outputs, visualizer)
-        for v, vis_image in enumerate(vis_results):
-            rgb_image = cv2.cvtColor(vis_image, cv2.COLOR_BGR2RGB)
-            cv2.imwrite(
-                f"{predictor.OUTPUT_DIR}/frame_{starting_frame_idx}_{v+1}.jpg",
-                rgb_image 
-            )
- 
         inference_state = predictor.predictor.init_state(video_path=args.input_video)
         predictor.predictor.clear_all_points_in_video(inference_state)
         predictor.RUNTIME['inference_state'] = inference_state
@@ -603,7 +593,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_video", type=str, required=True, help="Path to the input video (either *.mp4 or a directory containing image sequences)")
     args = parser.parse_args()
 
-    # PMB Would be nice to see skeletons...
+    # PMB Would be nice to see skeletons
     os.environ["MOMENTUM_ENABLED"] = "1"
 
     input_path = args.input_video
