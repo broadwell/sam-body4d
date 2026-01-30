@@ -125,26 +125,27 @@ def visualize_2d_results(
         )
         img_vis = visualizer.draw_skeleton(img_vis, keypoints_2d_vis)
 
+        # PMB Nope
         # Draw bounding box
-        bbox = person_output["bbox"]
-        img_vis = cv2.rectangle(
-            img_vis,
-            (int(bbox[0]), int(bbox[1])),
-            (int(bbox[2]), int(bbox[3])),
-            (0, 255, 0),  # Green color
-            2,
-        )
+        #bbox = person_output["bbox"]
+        #img_vis = cv2.rectangle(
+        #    img_vis,
+        #    (int(bbox[0]), int(bbox[1])),
+        #    (int(bbox[2]), int(bbox[3])),
+        #    (0, 255, 0),  # Green color
+        #    2,
+        #)
 
         # Add person ID text
-        cv2.putText(
-            img_vis,
-            f"Person {pid}",
-            (int(bbox[0]), int(bbox[1] - 10)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 0),
-            2,
-        )
+        #cv2.putText(
+        #    img_vis,
+        #    f"Person {pid}",
+        #    (int(bbox[0]), int(bbox[1] - 10)),
+        #    cv2.FONT_HERSHEY_SIMPLEX,
+        #    0.7,
+        #    (0, 255, 0),
+        #    2,
+        #)
 
         results.append(img_vis)
 

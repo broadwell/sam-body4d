@@ -46,6 +46,8 @@ def visualize_sample_together(img_cv2, outputs, faces, id_current):
 	if outputs is None:
 		return img_mesh
 
+        # PMB Probably should visualize skeleton here, too
+
 	# First, sort by depth, furthest to closest
 	try:
 		all_depths = np.stack([tmp['pred_cam_t'] for tmp in outputs], axis=0)[:, 2]
@@ -80,6 +82,7 @@ def visualize_sample_together(img_cv2, outputs, faces, id_current):
 			# mesh_base_color=LIGHT_BLUE,
 			mesh_base_color=all_color,
 			scene_bg_color=(1, 1, 1),
+                        return_rgba=True,
 		)
 		* 255
 	)
