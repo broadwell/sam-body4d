@@ -32,7 +32,7 @@ from omegaconf import OmegaConf
 from utils import draw_point_marker, mask_painter, images_to_mp4, DAVIS_PALETTE, jpg_folder_to_mp4, is_super_long_or_wide, keep_largest_component, is_skinny_mask, bbox_from_mask, gpu_profile, resize_mask_with_unique_label
 
 from models.sam_3d_body.sam_3d_body import load_sam_3d_body, SAM3DBodyEstimator
-from models.sam_3d_body.notebook.utils import process_image_with_mask, save_mesh_results, visualize_2d_results, setup_visualizer
+from models.sam_3d_body.notebook.utils import process_image_with_mask, save_mesh_results, visualize_2d_results, setup_visualizer, visualize_3d_mesh
 from models.sam_3d_body.tools.vis_utils import visualize_sample_together, visualize_sample
 from models.diffusion_vas.demo import init_amodal_segmentation_model, init_rgb_model, init_depth_model, load_and_transform_masks, load_and_transform_rgbs, rgb_to_depth
 
@@ -253,6 +253,7 @@ class OfflineApp:
         )
 
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_frames", exist_ok=True)
+        os.makedirs(f"{self.OUTPUT_DIR}/rendered_3d_frames", exist_ok=True)
         for obj_id in self.RUNTIME['out_obj_ids']:
             os.makedirs(f"{self.OUTPUT_DIR}/mesh_4d_individual/{obj_id}", exist_ok=True)
             os.makedirs(f"{self.OUTPUT_DIR}/focal_4d_individual/{obj_id}", exist_ok=True)
@@ -462,10 +463,17 @@ class OfflineApp:
                     id_current = id_batch[frame_id-num_empth_ids]
                 
                 img = cv2.imread(image_path)
-               
+
+                # PMB Multiple viszes
+                mesh_3d_vis = visualize_3d_mesh(img, mask_output, self.sam3_3d_body_model.faces)
+                cv2.imwrite(
+                    f"{self.OUTPUT_DIR}/rendered_3d_frames/{os.path.basename(image_path)[:-4]}.jpg",
+                    mesh_3d_vis[0],
+                )
+
                 # PMB Overlay 2D skeleton on original image 
                 vis_results = visualize_2d_results(img, mask_output, visualizer)
-                img_rgba = cv2.cvtColor(vis_results[0], cv2.COLOR_RGB2RGBA)
+                img_rgba = np.float32(cv2.cvtColor(vis_results[0], cv2.COLOR_RGB2RGBA))
 
                 # PMB Overlay mask on annotated image
                 rend_img = visualize_sample_together(img_rgba, mask_output, self.sam3_3d_body_model.faces, id_current)
@@ -474,13 +482,38 @@ class OfflineApp:
                 _, pose_mask = cv2.threshold(gray_mask, 254, 255, cv2.THRESH_BINARY_INV)
                 pose_idx = np.nonzero(pose_mask)
                 nonpose_idx = np.nonzero(nonpose_mask)
-               
+                
                 rend_img[nonpose_idx[0], nonpose_idx[1], :] = 0
-                masked_img = cv2.add(np.float32(rend_img), np.float32(img_rgba))
+
+                rend_img = rend_img.astype(float) / 255
+                img_rgba = img_rgba.astype(float) / 255
+
+                rend_img_alpha = rend_img[:, :, 3]
+                img_rgba_alpha = img_rgba[:, :, 3]
+                
+                rend_img_alpha[pose_idx[0], pose_idx[1]] *= .8
+
+                alpha_out = rend_img_alpha + img_rgba_alpha * (1 - rend_img_alpha)
+                alpha_out[alpha_out == 0] = 1
+                weight_rend_img = rend_img_alpha / alpha_out
+                weight_img_rgba = img_rgba_alpha * (1 - rend_img_alpha) / alpha_out
+
+                w_fg_3 = np.stack([weight_rend_img, weight_rend_img, weight_rend_img], axis=2)
+                w_bg_3 = np.stack([weight_img_rgba, weight_img_rgba, weight_img_rgba], axis=2)
+ 
+                blended_bgr = w_fg_3 * rend_img[:, :, :3] + w_bg_3 * img_rgba[:, :, :3]
+                blended_rgba = np.concatenate([blended_bgr, np.expand_dims(alpha_out, axis=2)], axis=2)
+
+                blended_rgba_uint8 = (blended_rgba * 255).astype(np.uint8)
+               
+                #img_rgba[pose_idx[0], pose_idx[1], 3] *= .5
+                #img_rgba[pose_idx[0], pose_idx[1], 3] = 255
+                #masked_img = cv2.add(np.float32(rend_img), np.float32(img_rgba))
                 
                 cv2.imwrite(
                     f"{self.OUTPUT_DIR}/rendered_frames/{os.path.basename(image_path)[:-4]}.jpg",
-                    masked_img,
+                    #masked_img.astype(np.uint8),
+                    blended_rgba_uint8,
                 )
 
                 # save rendered frames for individual person
