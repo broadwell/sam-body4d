@@ -171,7 +171,6 @@ class OfflineApp:
             } 
 
         print("Rendering segmentation results")
-
         # render the segmentation results every few frames
         vis_frame_stride = 1
         out_h = self.RUNTIME['inference_state']['video_height']
@@ -272,6 +271,7 @@ class OfflineApp:
         batch_size = self.RUNTIME['batch_size']
         n = len(images_list)
        
+        print("Preparing to detect occlusions, unless commented out") 
         # Optional, detect occlusions
         pred_res = self.RUNTIME['detection_resolution']
         pred_res_hi = self.RUNTIME['completion_resolution']
@@ -289,8 +289,12 @@ class OfflineApp:
         if len(modal_pixels_list) > 0:
             print("Will detect occlusions...") 
 
-        if False:
-        #for i in tqdm(range(0, n, batch_size)):
+        for i in tqdm(range(0, n, batch_size)):
+
+        mhr_shape_scale_dict = {}   # each element is a list storing input parameters for mhr_forward
+        obj_ratio_dict = {}         # avoid fake completion by obj ratio on the first frame
+
+        for i in tqdm(range(0, n, batch_size)):
             batch_images = images_list[i:i + batch_size]
             batch_masks  = masks_list[i:i + batch_size]
 
@@ -573,18 +577,11 @@ def inference(args):
             if len(outputs) > 0:
                 break
 
-        print("Found initial pose in frame", starting_frame_idx, "length of outputs", len(outputs))
-     
         inference_state = predictor.predictor.init_state(video_path=args.input_video)
-        print("initialized inference state")
         predictor.predictor.clear_all_points_in_video(inference_state)
-        print("cleared points in video")
         predictor.RUNTIME['inference_state'] = inference_state
-        print("set inference state")
         predictor.RUNTIME['out_obj_ids'] = []
-        print("cleared output IDs")
 
-        print("Loading bbox from first occupied frame")
         # 1. load bbox (first frame)
         for obj_id, output in enumerate(outputs):
             # Let's add a box at (x_min, y_min, x_max, y_max) = (300, 0, 500, 400) to get started
@@ -630,8 +627,7 @@ def inference(args):
             )
 
     # 2. tracking
-    #if not os.path.exists(os.path.join(predictor.OUTPUT_DIR, "masks")):
-    if True:
+    if not os.path.exists(os.path.join(predictor.OUTPUT_DIR, "masks")):
         print("generating masks")
         predictor.on_mask_generation(start_frame_idx=0)
     else:
