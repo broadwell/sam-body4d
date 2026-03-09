@@ -28,7 +28,7 @@ def visualize_sample(img_cv2, outputs, faces, id_current):
 				person_output["pred_cam_t"],
 				img_mesh.copy(),
 			    # mesh_base_color=LIGHT_BLUE,
-				mesh_base_color=color_list[id_current[pid]+4],
+				mesh_base_color=color_list[id_current[pid]+6],
 				scene_bg_color=(1, 1, 1),
 			)
 			* 255
@@ -65,7 +65,7 @@ def visualize_sample_together(img_cv2, outputs, faces, id_current):
 	for pid, person_output in enumerate(outputs_sorted):
 		all_pred_vertices.append(person_output["pred_vertices"] + person_output["pred_cam_t"])
 		all_faces.append(faces + len(person_output["pred_vertices"]) * pid)
-		all_color.append(color_list[id_current[id_sorted[pid]]+4])
+		all_color.append(color_list[id_current[id_sorted[pid]]+6])
 	all_pred_vertices = np.concatenate(all_pred_vertices, axis=0)
 	all_faces = np.concatenate(all_faces, axis=0)
 
