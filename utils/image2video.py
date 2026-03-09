@@ -2,6 +2,7 @@ import os, glob
 import cv2
 import numpy as np
 import imageio.v2 as imageio 
+import imageio.v3 as iio
 
 from typing import List 
 
@@ -24,25 +25,32 @@ def images_to_mp4(images: List[np.ndarray], output_path: str, fps: int = 25):
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    writer = imageio.get_writer(
-        output_path,
-        fps=int(fps),
-        format="FFMPEG",
-        codec="libx264",
-        pixelformat="yuv420p"
-    )
+    #writer = imageio.get_writer(
+    #    output_path,
+    #    fps=int(fps),
+    #    format="FFMPEG",
+    #    codec="libx264",
+    #    pixelformat="yuv420p"
+    #)
 
-    for img in images:
-        if img.ndim == 2:  # Gray → 3 channels
-            img = np.stack([img] * 3, axis=-1)
-        img = cv2.resize(img, (w, h))
-        if img.shape[2] == 4:
-            img = img[..., :3]  # Remove alpha
-        if img.dtype != np.uint8:
-            img = np.clip(img, 0, 255).astype(np.uint8)
-        writer.append_data(img)
+    print("Writing previs video to", output_path)
 
-    writer.close()
+    with iio.imopen(output_path, "w", plugin="pyav") as out_file:
+        out_file.init_video_stream("libx264", fps=fps)
+        # Optional: perform frame processing here
+
+        for img in images:
+            if img.ndim == 2:  # Gray → 3 channels
+                img = np.stack([img] * 3, axis=-1)
+            img = cv2.resize(img, (w, h))
+            if img.shape[2] == 4:
+                img = img[..., :3]  # Remove alpha
+            if img.dtype != np.uint8:
+                img = np.clip(img, 0, 255).astype(np.uint8)
+            #writer.append_data(img)
+            out_file.write_frame(img)
+
+    #writer.close()
     print(f"[OK] Saved video: {output_path}")
 
 
@@ -74,32 +82,37 @@ def jpg_folder_to_mp4(folder: str, output_filename: str, fps: int = 25):
     os.makedirs(os.path.dirname(output_filename), exist_ok=True)
 
     # Initialize writer with browser-safe configuration
-    writer = imageio.get_writer(
-        output_filename,
-        fps=int(fps),
-        format="FFMPEG",
-        codec="libx264",       # Required for HTML5 playback
-        pixelformat="yuv420p"  # Required for <video> compatibility
-    )
+    #writer = imageio.get_writer(
+    #    output_filename,
+    #    fps=int(fps),
+    #    format="FFMPEG",
+    #    codec="libx264",       # Required for HTML5 playback
+    #    pixelformat="yuv420p"  # Required for <video> compatibility
+    #)
 
-    for path in img_paths:
-        img = cv2.imread(path)
-        if img is None:
-            print(f"Warning: skipped unreadable image {path}")
-            continue
+    with iio.imopen(output_filename, "w", plugin="pyav") as out_file:
+        out_file.init_video_stream("libx264", fps=fps)
+        # Optional: perform frame processing here
 
-        # Force resize if needed
-        if img.shape[:2] != (h, w):
-            img = cv2.resize(img, (w, h))
+        for path in img_paths:
+            img = cv2.imread(path)
+            if img is None:
+                print(f"Warning: skipped unreadable image {path}")
+                continue
 
-        # BGR → RGB
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # Force resize if needed
+            if img.shape[:2] != (h, w):
+                img = cv2.resize(img, (w, h))
 
-        # Ensure correct dtype
-        if img.dtype != np.uint8:
-            img = np.clip(img, 0, 255).astype(np.uint8)
+            # BGR → RGB
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        writer.append_data(img)
+            # Ensure correct dtype
+            if img.dtype != np.uint8:
+                img = np.clip(img, 0, 255).astype(np.uint8)
 
-    writer.close()
+            out_file.write_frame(img)
+            #writer.append_data(img)
+
+    #writer.close()
     print(f"[OK] Saved video to: {output_filename}")

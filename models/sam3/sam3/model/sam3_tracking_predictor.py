@@ -60,8 +60,8 @@ class Sam3TrackerPredictor(Sam3TrackerBase):
         num_frames=None,
         video_path=None,
         cached_features=None,
-        offload_video_to_cpu=False,
-        offload_state_to_cpu=False,
+        offload_video_to_cpu=False, # PMB
+        offload_state_to_cpu=False, # PMB
         async_loading_frames=False,
     ):
         """Initialize a inference state."""

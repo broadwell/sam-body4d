@@ -170,6 +170,8 @@ class OfflineApp:
                 for i, out_obj_id in enumerate(self.RUNTIME['out_obj_ids'])
             } 
 
+        print("Rendering segmentation results")
+
         # render the segmentation results every few frames
         vis_frame_stride = 1
         out_h = self.RUNTIME['inference_state']['video_height']
@@ -252,6 +254,14 @@ class OfflineApp:
             ]
         )
 
+        # PMB The output viz video should have the same fps as the input, if known
+        video_fps = 25 # This is the default in the viz utils
+        if os.path.isfile(args.input_video):
+            video = cv2.VideoCapture(args.input_video)
+            if video.isOpened():
+                video_fps = video.get(cv2.CAP_PROP_FPS)
+                video.release()
+
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_frames", exist_ok=True)
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_3d_frames", exist_ok=True)
         for obj_id in self.RUNTIME['out_obj_ids']:
@@ -262,7 +272,6 @@ class OfflineApp:
         batch_size = self.RUNTIME['batch_size']
         n = len(images_list)
        
-        print("Preparing to detect occlusions, unless commented out") 
         # Optional, detect occlusions
         pred_res = self.RUNTIME['detection_resolution']
         pred_res_hi = self.RUNTIME['completion_resolution']
@@ -273,11 +282,15 @@ class OfflineApp:
         #        modal_pixels_list.append(modal_pixels)
         #    rgb_pixels, _, raw_rgb_pixels = load_and_transform_rgbs(self.OUTPUT_DIR + "/images", resolution=pred_res)
         #    depth_pixels = rgb_to_depth(rgb_pixels, self.depth_model)
-
+            
         mhr_shape_scale_dict = {}   # each element is a list storing input parameters for mhr_forward
         obj_ratio_dict = {}         # avoid fake completion by obj ratio on the first frame
+        
+        if len(modal_pixels_list) > 0:
+            print("Will detect occlusions...") 
 
-        for i in tqdm(range(0, n, batch_size)):
+        if False:
+        #for i in tqdm(range(0, n, batch_size)):
             batch_images = images_list[i:i + batch_size]
             batch_masks  = masks_list[i:i + batch_size]
 
@@ -288,7 +301,6 @@ class OfflineApp:
             idx_path = {}
             occ_dict = {}
             if len(modal_pixels_list) > 0:
-                print("detect occlusions ...")
                 pred_amodal_masks_dict = {}
                 for (modal_pixels, obj_id) in zip(modal_pixels_list, self.RUNTIME['out_obj_ids']):
                     # detect occlusions for each object
@@ -536,7 +548,8 @@ class OfflineApp:
 
         out_4d_path = os.path.join(self.OUTPUT_DIR, f"4d_{time.time():.0f}.mp4")
 
-        jpg_folder_to_mp4(f"{self.OUTPUT_DIR}/rendered_frames", out_4d_path)
+        print("Making an mp4 out of the rendered frames")
+        jpg_folder_to_mp4(f"{self.OUTPUT_DIR}/rendered_frames", out_4d_path, fps=video_fps)
 
         return out_4d_path
 
@@ -559,12 +572,19 @@ def inference(args):
             outputs = predictor.sam3_3d_body_model.process_one_image(image, bbox_thr=0.6,)
             if len(outputs) > 0:
                 break
+
+        print("Found initial pose in frame", starting_frame_idx, "length of outputs", len(outputs))
      
         inference_state = predictor.predictor.init_state(video_path=args.input_video)
+        print("initialized inference state")
         predictor.predictor.clear_all_points_in_video(inference_state)
+        print("cleared points in video")
         predictor.RUNTIME['inference_state'] = inference_state
+        print("set inference state")
         predictor.RUNTIME['out_obj_ids'] = []
+        print("cleared output IDs")
 
+        print("Loading bbox from first occupied frame")
         # 1. load bbox (first frame)
         for obj_id, output in enumerate(outputs):
             # Let's add a box at (x_min, y_min, x_max, y_max) = (300, 0, 500, 400) to get started
@@ -610,14 +630,16 @@ def inference(args):
             )
 
     # 2. tracking
-    if not os.path.exists(os.path.join(predictor.OUTPUT_DIR, "masks")):
+    #if not os.path.exists(os.path.join(predictor.OUTPUT_DIR, "masks")):
+    if True:
         print("generating masks")
         predictor.on_mask_generation(start_frame_idx=0)
     else:
         print("output masks folder already exists, skipping mask generation")
     # 3. hmr upon masks
     with torch.autocast("cuda", enabled=False):
-        predictor.on_4d_generation()
+        print("Predicting HMR on masks")
+        predictor.on_4d_generation(video_path=args.input_video)
 
 
 if __name__ == "__main__":

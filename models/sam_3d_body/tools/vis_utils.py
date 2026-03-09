@@ -27,6 +27,7 @@ def visualize_sample(img_cv2, outputs, faces, id_current):
 				person_output["pred_vertices"],
 				person_output["pred_cam_t"],
 				img_mesh.copy(),
+			    # mesh_base_color=LIGHT_BLUE,
 				mesh_base_color=color_list[id_current[pid]+4],
 				scene_bg_color=(1, 1, 1),
 			)
@@ -79,7 +80,7 @@ def visualize_sample_together(img_cv2, outputs, faces, id_current):
 			all_pred_vertices,
 			fake_pred_cam_t,
 			img_mesh,
-			# mesh_base_color=LIGHT_BLUE,
+			#mesh_base_color=LIGHT_BLUE,
 			mesh_base_color=all_color,
 			scene_bg_color=(1, 1, 1),
                         return_rgba=True,

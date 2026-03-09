@@ -135,7 +135,6 @@ class SAM3DBodyEstimator:
                 if image_format == "rgb":
                     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                     image_format = "bgr"
-                print("Running object detector...")
                 boxes = self.detector.run_human_detection(
                     img,
                     det_cat_id=det_cat_id,
@@ -143,7 +142,6 @@ class SAM3DBodyEstimator:
                     nms_thr=nms_thr,
                     default_to_full_image=False,
                 )
-                print("Found boxes:", boxes)
                 self.is_crop = True
             else:
                 boxes = np.array([0, 0, width, height]).reshape(1, 4)
@@ -173,7 +171,6 @@ class SAM3DBodyEstimator:
                 )  # Set high confidence for provided masks
                 use_mask = True
             elif use_mask and self.sam is not None:
-                print("Running SAM to get mask from bbox...")
                 # Generate masks using SAM2
                 masks, masks_score = self.sam.run_sam(img, boxes)
             else:
@@ -247,7 +244,6 @@ class SAM3DBodyEstimator:
                 cam_int = cam_int.to(batch["img"])
                 batch["cam_int"] = cam_int.clone()
             elif self.fov_estimator is not None:
-                print("Running FOV estimator ...")
                 # input_image = batch["img_ori"][0].data
                 if _occ_image_batch_ori is not None:
                     input_image = np.array(Image.open(_occ_image_batch_ori[i])).astype('uint8')
@@ -433,7 +429,6 @@ class SAM3DBodyEstimator:
             if image_format == "rgb":
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                 image_format = "bgr"
-            print("Running object detector...")
             boxes = self.detector.run_human_detection(
                 img,
                 det_cat_id=det_cat_id,
@@ -441,7 +436,6 @@ class SAM3DBodyEstimator:
                 nms_thr=nms_thr,
                 default_to_full_image=False,
             )
-            print("Found boxes:", boxes)
             self.is_crop = True
         else:
             boxes = np.array([0, 0, width, height]).reshape(1, 4)
@@ -459,7 +453,6 @@ class SAM3DBodyEstimator:
         masks_score = None
         if masks is not None:
             # Use provided masks - ensure they match the number of detected boxes
-            print(f"Using provided masks: {masks.shape}")
             assert (
                 bboxes is not None
             ), "Mask-conditioned inference requires bboxes input!"
@@ -469,7 +462,6 @@ class SAM3DBodyEstimator:
             )  # Set high confidence for provided masks
             use_mask = True
         elif use_mask and self.sam is not None:
-            print("Running SAM to get mask from bbox...")
             # Generate masks using SAM2
             masks, masks_score = self.sam.run_sam(img, boxes)
         else:
@@ -485,17 +477,15 @@ class SAM3DBodyEstimator:
         # Handle camera intrinsics
         # - either provided externally or generated via default FOV estimator
         if cam_int is not None:
-            print("Using provided camera intrinsics...")
             cam_int = cam_int.to(batch["img"])
             batch["cam_int"] = cam_int.clone()
         elif self.fov_estimator is not None:
-            # print("Running FOV estimator ...")
             input_image = batch["img_ori"][0].data
             cam_int = self.fov_estimator.get_cam_intrinsics(input_image).to(
                 batch["img"]
             )
             batch["cam_int"] = cam_int.clone()
-        else:
+        else: 
             cam_int = batch["cam_int"].clone()
 
         with torch.cuda.amp.autocast(enabled=False):

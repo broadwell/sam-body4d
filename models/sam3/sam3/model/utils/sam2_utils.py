@@ -274,22 +274,37 @@ def load_video_frames_from_video_file(
     """Load the video frames from a video file."""
     import decord
 
-    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
-    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
-    # Get the original video height and width
-    decord.bridge.set_bridge("torch")
-    video_height, video_width, _ = decord.VideoReader(video_path).next().shape
-    # Iterate over all frames in the video
-    images = []
-    for frame in decord.VideoReader(video_path, width=image_size, height=image_size):
-        images.append(frame.permute(2, 0, 1))
+    with torch.no_grad():
+        img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
+        img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
+        # Get the original video height and width
+        decord.bridge.set_bridge("torch")
+        video_height, video_width, _ = decord.VideoReader(video_path).next().shape
+        # Iterate over all frames in the video
+        images = []
+        for frame in decord.VideoReader(video_path, width=image_size, height=image_size):
+            # PMB try skipping all of this
 
-    images = torch.stack(images, dim=0).float() / 255.0
-    if not offload_video_to_cpu:
-        images = images.to(compute_device)
-        img_mean = img_mean.to(compute_device)
-        img_std = img_std.to(compute_device)
-    # normalize by mean and std
-    images -= img_mean
-    images /= img_std
+            frame_np = frame.numpy()
+            # PMB I don't think it's necessary to normalize the pixels
+            frame_np = frame_np.astype(np.float32) / 255.0
+            frame_np = frame_np.astype(np.float32) - 0.5
+            frame_np = frame_np.astype(np.float32) / 0.5
+            # PMB
+            image = torch.from_numpy(frame_np).permute(2, 0, 1)
+            #image -= img_mean
+            #image /= img_std
+            #images.append(frame.permute(2, 0, 1))
+
+            images.append(image)
+
+        #images = torch.stack(images, dim=0).float() / 255.0
+        #if not offload_video_to_cpu:
+        #    images = images.to(compute_device)
+        #    img_mean = img_mean.to(compute_device)
+        #    img_std = img_std.to(compute_device)
+        # normalize by mean and std
+        #images -= img_mean
+        #images /= img_std
+
     return images, video_height, video_width
