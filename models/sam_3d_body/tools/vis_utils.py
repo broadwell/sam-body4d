@@ -83,7 +83,7 @@ def visualize_sample_together(img_cv2, outputs, faces, id_current):
 			#mesh_base_color=LIGHT_BLUE,
 			mesh_base_color=all_color,
 			scene_bg_color=(1, 1, 1),
-                        return_rgba=True,
+            return_rgba=True,
 		)
 		* 255
 	)

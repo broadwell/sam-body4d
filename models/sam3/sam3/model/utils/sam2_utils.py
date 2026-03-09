@@ -283,18 +283,13 @@ def load_video_frames_from_video_file(
         # Iterate over all frames in the video
         images = []
         for frame in decord.VideoReader(video_path, width=image_size, height=image_size):
-            # PMB try skipping all of this
 
+            # PMB Using torch.stack causes OOM errors, so do it this way instead
             frame_np = frame.numpy()
-            # PMB I don't think it's necessary to normalize the pixels
             frame_np = frame_np.astype(np.float32) / 255.0
             frame_np = frame_np.astype(np.float32) - 0.5
             frame_np = frame_np.astype(np.float32) / 0.5
-            # PMB
             image = torch.from_numpy(frame_np).permute(2, 0, 1)
-            #image -= img_mean
-            #image /= img_std
-            #images.append(frame.permute(2, 0, 1))
 
             images.append(image)
 

@@ -485,7 +485,7 @@ class SAM3DBodyEstimator:
                 batch["img"]
             )
             batch["cam_int"] = cam_int.clone()
-        else: 
+        else:
             cam_int = batch["cam_int"].clone()
 
         with torch.cuda.amp.autocast(enabled=False):
