@@ -283,13 +283,8 @@ class OfflineApp:
         #    rgb_pixels, _, raw_rgb_pixels = load_and_transform_rgbs(self.OUTPUT_DIR + "/images", resolution=pred_res)
         #    depth_pixels = rgb_to_depth(rgb_pixels, self.depth_model)
             
-        mhr_shape_scale_dict = {}   # each element is a list storing input parameters for mhr_forward
-        obj_ratio_dict = {}         # avoid fake completion by obj ratio on the first frame
-        
         if len(modal_pixels_list) > 0:
             print("Will detect occlusions...") 
-
-        for i in tqdm(range(0, n, batch_size)):
 
         mhr_shape_scale_dict = {}   # each element is a list storing input parameters for mhr_forward
         obj_ratio_dict = {}         # avoid fake completion by obj ratio on the first frame
