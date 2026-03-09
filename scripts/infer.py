@@ -271,7 +271,6 @@ class OfflineApp:
         batch_size = self.RUNTIME['batch_size']
         n = len(images_list)
        
-        print("Preparing to detect occlusions, unless commented out") 
         # Optional, detect occlusions
         pred_res = self.RUNTIME['detection_resolution']
         pred_res_hi = self.RUNTIME['completion_resolution']
