@@ -29,7 +29,7 @@ dependencies = [
     "diffusers==0.29.1",
     "transformers~=4.57.3",
     "accelerate~=1.12.0",
-    "imageio[ffmpeg]",
+    "imageio[pyav]",
 
     # MoGe
     "MoGe @ git+https://github.com/microsoft/MoGe.git",
