@@ -1652,11 +1652,13 @@ class SAM3DBody(BaseModel):
                     return_joint_rotations=True,
                 )
             )
-            j3d = j3d[:, :70]  # 308 --> 70 keypoints
+            # PMB keep all keypoints for projection to 2D
             verts[..., [1, 2]] *= -1  # Camera system difference
             j3d[..., [1, 2]] *= -1  # Camera system difference
+            j3d_70 = j3d[:, :70]  # 308 --> 70 keypoints
             jcoords[..., [1, 2]] *= -1
-            pose_output["mhr"]["pred_keypoints_3d"] = j3d
+            pose_output["mhr"]["pred_keypoints_3d"] = j3d_70
+            pose_output["mhr"]["pred_keypoints_3d_all"] = j3d
             pose_output["mhr"]["pred_vertices"] = verts
             pose_output["mhr"]["pred_joint_coords"] = jcoords
             pose_output["mhr"]["pred_pose_raw"][
@@ -1667,7 +1669,7 @@ class SAM3DBody(BaseModel):
         ########################################################
         # Project to 2D
         pred_keypoints_3d_proj = (
-            pose_output["mhr"]["pred_keypoints_3d"]
+            pose_output["mhr"]["pred_keypoints_3d_all"] # PMB
             + pose_output["mhr"]["pred_cam_t"][:, None, :]
         )
         pred_keypoints_3d_proj[:, :, [0, 1]] *= pose_output["mhr"]["focal_length"][
@@ -1683,7 +1685,9 @@ class SAM3DBody(BaseModel):
         pred_keypoints_3d_proj[:, :, :2] = (
             pred_keypoints_3d_proj[:, :, :2] / pred_keypoints_3d_proj[:, :, [2]]
         )
-        pose_output["mhr"]["pred_keypoints_2d"] = pred_keypoints_3d_proj[:, :, :2]
+        # PMB
+        pose_output["mhr"]["pred_keypoints_2d"] = pred_keypoints_3d_proj[:, :70, :2]
+        pose_output["mhr"]["pred_keypoints_2d_all"] = pred_keypoints_3d_proj[:, :, :2]
 
         return pose_output, batch_lhand, batch_rhand, lhand_output, rhand_output
 
