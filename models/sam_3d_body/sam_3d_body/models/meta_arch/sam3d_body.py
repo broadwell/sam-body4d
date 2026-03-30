@@ -1235,6 +1235,23 @@ class SAM3DBody(BaseModel):
 
         return pose_output
 
+    # PMB
+    def project_3d_to_2d(self, mhr_output, key_for_3d, height, width):
+        keypoints = (
+            mhr_output[key_for_3d]
+            + mhr_output["pred_cam_t"][:, None, :]
+        )
+        keypoints[:, :, [0, 1]] *= mhr_output["focal_length"][:, None, None]
+        keypoints[:, :, [0, 1]] = (
+            keypoints[:, :, [0, 1]]
+            + torch.FloatTensor([width / 2, height / 2]).to(keypoints)[None, None, :]
+            * keypoints[:, :, [2]]
+        )
+        keypoints[:, :, :2] = (
+            keypoints[:, :, :2] / keypoints[:, :, [2]]
+        )
+        return keypoints[:, :, :2]
+
     def run_inference(
         self,
         img,
@@ -1658,7 +1675,7 @@ class SAM3DBody(BaseModel):
             j3d_70 = j3d[:, :70]  # 308 --> 70 keypoints
             jcoords[..., [1, 2]] *= -1
             pose_output["mhr"]["pred_keypoints_3d"] = j3d_70
-            pose_output["mhr"]["pred_keypoints_3d_all"] = j3d
+            #pose_output["mhr"]["pred_keypoints_3d_all"] = j3d
             pose_output["mhr"]["pred_vertices"] = verts
             pose_output["mhr"]["pred_joint_coords"] = jcoords
             pose_output["mhr"]["pred_pose_raw"][
@@ -1667,27 +1684,9 @@ class SAM3DBody(BaseModel):
             pose_output["mhr"]["mhr_model_params"] = mhr_model_params
 
         ########################################################
-        # Project to 2D
-        pred_keypoints_3d_proj = (
-            pose_output["mhr"]["pred_keypoints_3d_all"] # PMB
-            + pose_output["mhr"]["pred_cam_t"][:, None, :]
-        )
-        pred_keypoints_3d_proj[:, :, [0, 1]] *= pose_output["mhr"]["focal_length"][
-            :, None, None
-        ]
-        pred_keypoints_3d_proj[:, :, [0, 1]] = (
-            pred_keypoints_3d_proj[:, :, [0, 1]]
-            + torch.FloatTensor([width / 2, height / 2]).to(pred_keypoints_3d_proj)[
-                None, None, :
-            ]
-            * pred_keypoints_3d_proj[:, :, [2]]
-        )
-        pred_keypoints_3d_proj[:, :, :2] = (
-            pred_keypoints_3d_proj[:, :, :2] / pred_keypoints_3d_proj[:, :, [2]]
-        )
-        # PMB
-        pose_output["mhr"]["pred_keypoints_2d"] = pred_keypoints_3d_proj[:, :70, :2]
-        pose_output["mhr"]["pred_keypoints_2d_all"] = pred_keypoints_3d_proj[:, :, :2]
+        # Project to 2D - PMB
+        pose_output["mhr"]["pred_keypoints_2d"] = self.project_3d_to_2d(pose_output["mhr"], "pred_keypoints_3d", height, width)
+        pose_output["mhr"]["pred_keypoints_2d_all"] = self.project_3d_to_2d(pose_output["mhr"], "pred_joint_coords", height, width)
 
         return pose_output, batch_lhand, batch_rhand, lhand_output, rhand_output
 
@@ -2239,11 +2238,14 @@ class SAM3DBody(BaseModel):
                     return_joint_rotations=True,
                 )
             )
-            j3d = j3d[:, :70]  # 308 --> 70 keypoints
+            # PMB keep all keypoints for projection to 2D
+            # Why is all this code here twice?
             verts[..., [1, 2]] *= -1  # Camera system difference
             j3d[..., [1, 2]] *= -1  # Camera system difference
+            j3d_70 = j3d[:, :70]  # 308 --> 70 keypoints
             jcoords[..., [1, 2]] *= -1
-            pose_output["mhr"]["pred_keypoints_3d"] = j3d
+            pose_output["mhr"]["pred_keypoints_3d"] = j3d_70
+            #pose_output["mhr"]["pred_keypoints_3d_all"] = j3d
             pose_output["mhr"]["pred_vertices"] = verts
             pose_output["mhr"]["pred_joint_coords"] = jcoords
             pose_output["mhr"]["pred_pose_raw"][
@@ -2252,25 +2254,9 @@ class SAM3DBody(BaseModel):
             pose_output["mhr"]["mhr_model_params"] = mhr_model_params
 
         ########################################################
-        # Project to 2D
-        pred_keypoints_3d_proj = (
-            pose_output["mhr"]["pred_keypoints_3d"]
-            + pose_output["mhr"]["pred_cam_t"][:, None, :]
-        )
-        pred_keypoints_3d_proj[:, :, [0, 1]] *= pose_output["mhr"]["focal_length"][
-            :, None, None
-        ]
-        pred_keypoints_3d_proj[:, :, [0, 1]] = (
-            pred_keypoints_3d_proj[:, :, [0, 1]]
-            + torch.FloatTensor([width / 2, height / 2]).to(pred_keypoints_3d_proj)[
-                None, None, :
-            ]
-            * pred_keypoints_3d_proj[:, :, [2]]
-        )
-        pred_keypoints_3d_proj[:, :, :2] = (
-            pred_keypoints_3d_proj[:, :, :2] / pred_keypoints_3d_proj[:, :, [2]]
-        )
-        pose_output["mhr"]["pred_keypoints_2d"] = pred_keypoints_3d_proj[:, :, :2]
+        # Project to 2D - PMB
+        pose_output["mhr"]["pred_keypoints_2d"] = self.project_3d_to_2d(pose_output["mhr"], "pred_keypoints_3d", height, width)
+        pose_output["mhr"]["pred_keypoints_2d_all"] = self.project_3d_to_2d(pose_output["mhr"], "pred_joint_coords", height, width)
 
         return pose_output, batch_lhand, batch_rhand, lhand_output, rhand_output
 

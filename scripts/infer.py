@@ -263,6 +263,7 @@ class OfflineApp:
 
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_frames", exist_ok=True)
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_3d_frames", exist_ok=True)
+        os.makedirs(f"{self.OUTPUT_DIR}/rendered_2d_frames", exist_ok=True)
         for obj_id in self.RUNTIME['out_obj_ids']:
             os.makedirs(f"{self.OUTPUT_DIR}/mesh_4d_individual/{obj_id}", exist_ok=True)
             os.makedirs(f"{self.OUTPUT_DIR}/focal_4d_individual/{obj_id}", exist_ok=True)
@@ -484,6 +485,10 @@ class OfflineApp:
                 # PMB Overlay 2D skeleton on original image 
                 vis_results = visualize_2d_results(img, mask_output, visualizer)
                 img_rgba = np.float32(cv2.cvtColor(vis_results[0], cv2.COLOR_RGB2RGBA))
+                cv2.imwrite(
+                    f"{self.OUTPUT_DIR}/rendered_2d_frames/{os.path.basename(image_path)[:-4]}.jpg",
+                    img_rgba.astype(np.uint8)
+                )
 
                 # PMB Overlay mask on annotated image
                 rend_img = visualize_sample_together(img_rgba, mask_output, self.sam3_3d_body_model.faces, id_current)

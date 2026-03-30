@@ -317,6 +317,7 @@ class SAM3DBodyEstimator:
                         "focal_length": out["focal_length"][b_idx * num_objects + idx],
                         "pred_keypoints_3d": out["pred_keypoints_3d"][b_idx * num_objects + idx],
                         "pred_keypoints_2d": out["pred_keypoints_2d"][b_idx * num_objects + idx],
+                        "pred_keypoints_2d_all": out["pred_keypoints_2d_all"][idx], # PMB
                         "pred_vertices": out["pred_vertices"][b_idx * num_objects + idx],
                         "pred_cam_t": out["pred_cam_t"][b_idx * num_objects + idx],
                         "pred_pose_raw": out["pred_pose_raw"][b_idx * num_objects + idx],
@@ -506,12 +507,14 @@ class SAM3DBodyEstimator:
         out = recursive_to(out, "numpy")
         all_out = []
         for idx in range(batch["img"].shape[1]):
+
             all_out.append(
                 {
                     "bbox": batch["bbox"][0, idx].cpu().numpy(),
                     "focal_length": out["focal_length"][idx],
                     "pred_keypoints_3d": out["pred_keypoints_3d"][idx],
                     "pred_keypoints_2d": out["pred_keypoints_2d"][idx],
+                    "pred_keypoints_2d_all": out["pred_keypoints_2d_all"][idx], # PMB
                     "pred_vertices": out["pred_vertices"][idx],
                     "pred_cam_t": out["pred_cam_t"][idx],
                     "pred_pose_raw": out["pred_pose_raw"][idx],

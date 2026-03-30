@@ -120,10 +120,21 @@ def visualize_2d_results(
 
         # Draw keypoints
         keypoints_2d = person_output["pred_keypoints_2d"]
+
         keypoints_2d_vis = np.concatenate(
             [keypoints_2d, np.ones((keypoints_2d.shape[0], 1))], axis=-1
         )
         img_vis = visualizer.draw_skeleton(img_vis, keypoints_2d_vis)
+
+        # PMB overlay all keypoints to show what the model actually provides
+        # Note that this is dependent on the batch_size set in configs/body4d.yaml
+        # -- the pred_joint_coords output from the model is only generated once
+        # per batch, apparently (unlike the keypoint coords). So for now, the batch
+        # size needs to be set to 1 in order for this vis to show all of the joints
+        # for the current frame, rather than from the frame at the top of the batch
+        all_keypoints_2d = person_output["pred_keypoints_2d_all"]
+        for kpt in all_keypoints_2d:
+            img_vis = cv2.circle(img_vis, center=(round(kpt[0]), round(kpt[1])), radius=2, color=(0, 0, 255), thickness=-1)
 
         # PMB Nope
         # Draw bounding box
@@ -446,7 +457,7 @@ def process_image_with_mask(estimator, image_path: str, mask_path: str, idx_path
             else:
                 oid_outputs.append(_occ_outputs[ib])
                 ib += 1
-        
+
         mask_outputs_dict[obj_id] = oid_outputs
 
     final_outputs = []
