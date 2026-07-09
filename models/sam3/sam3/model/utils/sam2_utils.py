@@ -282,13 +282,11 @@ def load_video_frames_from_video_file(
         # Get the original video height and width
         decord.bridge.set_bridge("torch")
 
+        video_height, video_width, _ = decord.VideoReader(video_path).next().shape
+        
         # PMB if we're passing in the decord rather than the image stack
         vr = decord.VideoReader(video_path, width=image_size, height=image_size)
-        video_height, video_width, _ = vr[0].shape
-        
         return vr, video_height, video_width 
-        
-        #video_height, video_width, _ = decord.VideoReader(video_path).next().shape
 
         # Iterate over all frames in the video
         #images = []

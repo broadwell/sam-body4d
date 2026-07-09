@@ -582,7 +582,6 @@ def inference(args):
         for starting_frame_idx in range(10, 100):
             image = np.array(read_frame_at(args.input_video, starting_frame_idx))
             outputs = predictor.sam3_3d_body_model.process_one_image(image, bbox_thr=0.6,)
-            del image # PMB
             if len(outputs) > 0:
                 break
 
