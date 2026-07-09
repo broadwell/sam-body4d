@@ -4,6 +4,7 @@ import logging
 from collections import OrderedDict
 
 import torch
+import numpy as np
 
 from sam3.model.sam3_tracker_base import concat_points, NO_OBJ_SCORE, Sam3TrackerBase
 from sam3.model.sam3_tracker_utils import fill_holes_in_mask_scores
@@ -52,6 +53,19 @@ class Sam3TrackerPredictor(Sam3TrackerBase):
         self.iter_use_prev_mask_pred = True
         self.add_all_frames_to_correct_as_cond = True
 
+
+    # PMB
+    def preprocess_frame(self, vr, frame_index):
+        frame = vr[frame_index]
+
+        frame_np = frame.numpy()
+        frame_np = frame_np.astype(np.float32) / 255.0
+        frame_np = frame_np.astype(np.float32) - 0.5
+        frame_np = frame_np.astype(np.float32) / 0.5
+        image = torch.from_numpy(frame_np).permute(2, 0, 1)
+        del frame_np # PMB
+        return image
+
     @torch.inference_mode()
     def init_state(
         self,
@@ -81,6 +95,7 @@ class Sam3TrackerPredictor(Sam3TrackerBase):
             inference_state["storage_device"] = torch.device("cuda")
 
         if video_path is not None:
+            # PMB images is now just the decord VideoReader
             images, video_height, video_width = load_video_frames(
                 video_path=video_path,
                 image_size=self.image_size,
@@ -695,7 +710,7 @@ class Sam3TrackerPredictor(Sam3TrackerBase):
             for obj_temp_output_dict in temp_output_dict_per_obj.values():
                 temp_frame_inds.update(obj_temp_output_dict[storage_key].keys())
             consolidated_frame_inds[storage_key].update(temp_frame_inds)
-            # consolidate the temprary output across all objects on this frame
+            # consolidate the temporary output across all objects on this frame
             for frame_idx in temp_frame_inds:
                 consolidated_out = self._consolidate_temp_output_across_obj(
                     inference_state,
@@ -1026,7 +1041,10 @@ class Sam3TrackerPredictor(Sam3TrackerBase):
                 )
             else:
                 # Cache miss -- we will run inference on a single image
-                image = inference_state["images"][frame_idx].cuda().float().unsqueeze(0)
+                #image = inference_state["images"][frame_idx].cuda().float().unsqueeze(0)
+
+                # PMB - if we're using just the decord rather than the stack of images
+                image = self.preprocess_frame(inference_state["images"], frame_idx).cuda().float().unsqueeze(0)
                 backbone_out = self.forward_image(image)
                 # Cache the most recent frame's feature (for repeated interactions with
                 # a frame; we can use an LRU cache for more frames in the future).

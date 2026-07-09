@@ -106,6 +106,7 @@ def load_video_frames(
     Load the video frames from video_path. The frames are resized to image_size as in
     the model and are loaded to GPU if offload_video_to_cpu=False. This is used by the demo.
     """
+    print("Loading video frames, into CPU (GPU otherwise)?", offload_video_to_cpu)
     is_bytes = isinstance(video_path, bytes)
     is_str = isinstance(video_path, str)
     is_mp4_path = is_str and os.path.splitext(video_path)[-1] in [".mp4", ".MP4"]
@@ -274,24 +275,34 @@ def load_video_frames_from_video_file(
     """Load the video frames from a video file."""
     import decord
 
+    print("Loading video frames from video file")
     with torch.no_grad():
         img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
         img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
         # Get the original video height and width
         decord.bridge.set_bridge("torch")
-        video_height, video_width, _ = decord.VideoReader(video_path).next().shape
+
+        # PMB if we're passing in the decord rather than the image stack
+        vr = decord.VideoReader(video_path, width=image_size, height=image_size)
+        video_height, video_width, _ = vr[0].shape
+        
+        return vr, video_height, video_width 
+        
+        #video_height, video_width, _ = decord.VideoReader(video_path).next().shape
+
         # Iterate over all frames in the video
-        images = []
-        for frame in decord.VideoReader(video_path, width=image_size, height=image_size):
+        #images = []
+        #for frame in decord.VideoReader(video_path, width=image_size, height=image_size):
 
-            # PMB Using torch.stack causes OOM errors, so do it this way instead
-            frame_np = frame.numpy()
-            frame_np = frame_np.astype(np.float32) / 255.0
-            frame_np = frame_np.astype(np.float32) - 0.5
-            frame_np = frame_np.astype(np.float32) / 0.5
-            image = torch.from_numpy(frame_np).permute(2, 0, 1)
+        #    # PMB Using torch.stack causes OOM errors, so do it this way instead
+        #    frame_np = frame.numpy()
+        #    frame_np = frame_np.astype(np.float32) / 255.0
+        #    frame_np = frame_np.astype(np.float32) - 0.5
+        #    frame_np = frame_np.astype(np.float32) / 0.5
+        #    image = torch.from_numpy(frame_np).permute(2, 0, 1)
+        #    del frame_np # PMB
 
-            images.append(image)
+        #    images.append(image)
 
         #images = torch.stack(images, dim=0).float() / 255.0
         #if not offload_video_to_cpu:
@@ -302,4 +313,4 @@ def load_video_frames_from_video_file(
         #images -= img_mean
         #images /= img_std
 
-    return images, video_height, video_width
+    #return images, video_height, video_width

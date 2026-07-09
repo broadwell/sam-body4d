@@ -149,6 +149,18 @@ class OfflineApp:
         self.RUNTIME['smpl_export'] = self.CONFIG.runtime.get('smpl_export', False)
         self.RUNTIME['bboxes'] = None
 
+    # PMB
+    def preprocess_frame(self, vr, frame_index):
+        frame = vr[frame_index]
+
+        frame_np = frame.numpy()
+        frame_np = frame_np.astype(np.float32) / 255.0
+        frame_np = frame_np.astype(np.float32) - 0.5
+        frame_np = frame_np.astype(np.float32) / 0.5
+        image = torch.from_numpy(frame_np).permute(2, 0, 1)
+        del frame_np # PMB
+        return image
+
     def on_mask_generation(self, video_path: str=None, start_frame_idx: int = 0, max_frame_num_to_track: int = 1800):
         """
         Mask generation across the video.
@@ -185,7 +197,9 @@ class OfflineApp:
         for out_frame_idx in range(0, len(video_segments), vis_frame_stride):
             if os.path.exists(os.path.join(IMAGE_PATH, f"{out_frame_idx+start_frame_idx:08d}.jpg")) and os.path.exists(os.path.join(IMAGE_PATH, f"{out_frame_idx+start_frame_idx:08d}.png")):
                 continue
-            img = self.RUNTIME['inference_state']['images'][out_frame_idx].detach().float().cpu()
+            # PMB
+            #img = self.RUNTIME['inference_state']['images'][out_frame_idx].detach().float().cpu()
+            img = self.preprocess_frame(self.RUNTIME['inference_state']['images'], out_frame_idx).detach().float().cpu()
             img = (img + 1) / 2
             img = img.clamp(0, 1)
             img = F.interpolate(
@@ -506,7 +520,7 @@ class OfflineApp:
                 rend_img_alpha = rend_img[:, :, 3]
                 img_rgba_alpha = img_rgba[:, :, 3]
                 
-                rend_img_alpha[pose_idx[0], pose_idx[1]] *= .8
+                rend_img_alpha[pose_idx[0], pose_idx[1]] *= .7
 
                 alpha_out = rend_img_alpha + img_rgba_alpha * (1 - rend_img_alpha)
                 alpha_out[alpha_out == 0] = 1
@@ -521,13 +535,8 @@ class OfflineApp:
 
                 blended_rgba_uint8 = (blended_rgba * 255).astype(np.uint8)
                
-                #img_rgba[pose_idx[0], pose_idx[1], 3] *= .5
-                #img_rgba[pose_idx[0], pose_idx[1], 3] = 255
-                #masked_img = cv2.add(np.float32(rend_img), np.float32(img_rgba))
-                
                 cv2.imwrite(
                     f"{self.OUTPUT_DIR}/rendered_frames/{os.path.basename(image_path)[:-4]}.jpg",
-                    #masked_img.astype(np.uint8),
                     blended_rgba_uint8,
                 )
 
@@ -573,6 +582,7 @@ def inference(args):
         for starting_frame_idx in range(10, 100):
             image = np.array(read_frame_at(args.input_video, starting_frame_idx))
             outputs = predictor.sam3_3d_body_model.process_one_image(image, bbox_thr=0.6,)
+            del image # PMB
             if len(outputs) > 0:
                 break
 
