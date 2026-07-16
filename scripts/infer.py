@@ -161,7 +161,7 @@ class OfflineApp:
         del frame_np # PMB
         return image
 
-    def on_mask_generation(self, video_path: str=None, start_frame_idx: int = 0, max_frame_num_to_track: int = 1800):
+    def on_mask_generation(self, video_path: str=None, start_frame_idx: int = 0, max_frame_num_to_track: int = None):
         """
         Mask generation across the video.
         Currently runs SAM-3 propagation and renders a mask video.
@@ -278,6 +278,7 @@ class OfflineApp:
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_frames", exist_ok=True)
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_3d_frames", exist_ok=True)
         os.makedirs(f"{self.OUTPUT_DIR}/rendered_2d_frames", exist_ok=True)
+        os.makedirs(f"{self.OUTPUT_DIR}/skeleton_3d_frames", exist_ok=True)
         for obj_id in self.RUNTIME['out_obj_ids']:
             os.makedirs(f"{self.OUTPUT_DIR}/mesh_4d_individual/{obj_id}", exist_ok=True)
             os.makedirs(f"{self.OUTPUT_DIR}/focal_4d_individual/{obj_id}", exist_ok=True)
@@ -487,6 +488,9 @@ class OfflineApp:
                     mask_output = mask_outputs[frame_id-num_empth_ids]
                     id_current = id_batch[frame_id-num_empth_ids]
                 
+                if mask_output is None:
+                    continue
+
                 img = cv2.imread(image_path)
 
                 # PMB Multiple viszes
@@ -547,6 +551,14 @@ class OfflineApp:
                         f"{self.OUTPUT_DIR}/rendered_frames_individual/{ri+1}/{os.path.basename(image_path)[:-4]}_{ri+1}.jpg",
                         rend_img.astype(np.uint8),
                     )
+                    # PMB Also overlay the 2D skeleton on the white background mesh body
+                    overlay_results = visualize_2d_results(rend_img, mask_output, visualizer)
+                    overlay_rgba = np.float32(cv2.cvtColor(overlay_results[0], cv2.COLOR_RGB2RGBA))
+                    cv2.imwrite(
+                        f"{self.OUTPUT_DIR}/skeleton_3d_frames/{os.path.basename(image_path)[:-4]}.jpg",
+                        overlay_rgba.astype(np.uint8)
+                    )
+
                 # save mesh for individual person
                 save_mesh_results(
                     outputs=mask_output, 
@@ -558,10 +570,13 @@ class OfflineApp:
                 )
 
 
-        out_4d_path = os.path.join(self.OUTPUT_DIR, f"4d_{time.time():.0f}.mp4")
-
+        out_4d_path = os.path.join(self.OUTPUT_DIR, "rendered_frames.mp4")
         print("Making an mp4 out of the rendered frames")
         jpg_folder_to_mp4(f"{self.OUTPUT_DIR}/rendered_frames", out_4d_path, fps=video_fps)
+        
+        out_4d_path = os.path.join(self.OUTPUT_DIR, "rendered_meshes.mp4")
+        print("Making an mp4 out of the individual rendered meshes (1 person)")
+        jpg_folder_to_mp4(f"{self.OUTPUT_DIR}/rendered_frames_individual/1", out_4d_path, fps=video_fps)
 
         return out_4d_path
 
