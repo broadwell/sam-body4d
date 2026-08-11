@@ -182,7 +182,6 @@ class OfflineApp:
                 for i, out_obj_id in enumerate(self.RUNTIME['out_obj_ids'])
             } 
 
-        print("Rendering segmentation results")
         # render the segmentation results every few frames
         vis_frame_stride = 1
         out_h = self.RUNTIME['inference_state']['video_height']
@@ -283,6 +282,7 @@ class OfflineApp:
             os.makedirs(f"{self.OUTPUT_DIR}/mesh_4d_individual/{obj_id}", exist_ok=True)
             os.makedirs(f"{self.OUTPUT_DIR}/focal_4d_individual/{obj_id}", exist_ok=True)
             os.makedirs(f"{self.OUTPUT_DIR}/rendered_frames_individual/{obj_id}", exist_ok=True)
+            os.makedirs(f"{self.OUTPUT_DIR}/side_frames_individual/{obj_id}", exist_ok=True)
 
         batch_size = self.RUNTIME['batch_size']
         n = len(images_list)
@@ -493,7 +493,7 @@ class OfflineApp:
 
                 img = cv2.imread(image_path)
 
-                # PMB Multiple viszes
+                # PMB Multiple viszes (4, including side view)
                 mesh_3d_vis = visualize_3d_mesh(img, mask_output, self.sam3_3d_body_model.faces)
                 cv2.imwrite(
                     f"{self.OUTPUT_DIR}/rendered_3d_frames/{os.path.basename(image_path)[:-4]}.jpg",
@@ -568,7 +568,14 @@ class OfflineApp:
                     image_path=image_path,
                     id_current=id_current,
                 )
-
+                
+                # save rendered frames for individual person
+                side_rend_img_list = visualize_sample(img, mask_output, self.sam3_3d_body_model.faces, id_current, side_view=True)
+                for ri, rend_img in enumerate(side_rend_img_list):
+                    cv2.imwrite(
+                        f"{self.OUTPUT_DIR}/side_frames_individual/{ri+1}/{os.path.basename(image_path)[:-4]}_{ri+1}.jpg",
+                        rend_img.astype(np.uint8),
+                    )
 
         out_4d_path = os.path.join(self.OUTPUT_DIR, "rendered_frames.mp4")
         print("Making an mp4 out of the rendered frames")
@@ -577,6 +584,10 @@ class OfflineApp:
         out_4d_path = os.path.join(self.OUTPUT_DIR, "rendered_meshes.mp4")
         print("Making an mp4 out of the individual rendered meshes (1 person)")
         jpg_folder_to_mp4(f"{self.OUTPUT_DIR}/rendered_frames_individual/1", out_4d_path, fps=video_fps)
+        
+        out_4d_path = os.path.join(self.OUTPUT_DIR, "rendered_side_meshes.mp4")
+        print("Making an mp4 out of the individual rendered side meshes (1 person)")
+        jpg_folder_to_mp4(f"{self.OUTPUT_DIR}/side_frames_individual/1", out_4d_path, fps=video_fps)
 
         return out_4d_path
 

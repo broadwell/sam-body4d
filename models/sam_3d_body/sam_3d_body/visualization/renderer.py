@@ -13,8 +13,8 @@ import torch
 import trimesh
 import colorsys
 
-
-def get_light_poses(n_lights=5, elevation=np.pi / 3, dist=12):
+# PMB reducing n_lights from 5 to 1 for more dramatic lighting
+def get_light_poses(n_lights=1, elevation=np.pi / 3, dist=12):
     # get lights in a circle around origin at elevation
     thetas = elevation * np.ones(n_lights)
     phis = 2 * np.pi * np.arange(n_lights) / n_lights
@@ -222,10 +222,11 @@ class Renderer:
 
         # Optional view rotations
         if side_view:
-            rot = trimesh.transformations.rotation_matrix(
-                np.radians(rot_angle), [0, 1, 0]
-            )
-            mesh.apply_transform(rot)
+            pass
+        #    rot = trimesh.transformations.rotation_matrix(
+        #        np.radians(rot_angle), [0, 1, 0]
+        #    )
+        #    mesh.apply_transform(rot)
         elif top_view:
             rot = trimesh.transformations.rotation_matrix(
                 np.radians(rot_angle), [1, 0, 0]
@@ -264,7 +265,50 @@ class Renderer:
             cy=camera_center[1],
             zfar=1e12,
         )
-        scene.add(camera, pose=camera_pose)
+        camera_node = scene.add(camera, pose=camera_pose)
+
+        # PMB real side view in the scene, rather than just rotating the pose
+        if side_view:
+            forward_direction = -camera_pose[:3, 2]
+
+            # Current camera position and target
+            cam_pos = camera_pose[:3, 3]
+
+            camera_distance = np.linalg.norm(cam_pos)
+
+            camera_target = cam_pos + camera_distance * forward_direction
+
+            dx = cam_pos[0] - camera_target[0]
+            dz = cam_pos[2] - camera_target[2]
+
+            # Find current distance and angle in XZ plane
+            dist = np.sqrt(dx**2 + dz**2)
+            angle = np.arctan2(dz, dx)
+
+            # Subtract 90 degrees (pi / 2 radians)
+            # Camera revolves 90 degrees counterclockwise around target
+            new_angle = angle - np.pi / 2
+
+            # Compute new X and Z
+            new_x = camera_target[0] + dist * np.cos(new_angle)
+            new_z = camera_target[2] + dist * np.sin(new_angle)
+            new_pos = np.array([new_x, cam_pos[1], new_z])
+
+            # Re-orient camera to look at target from new position
+            forward = camera_target - new_pos
+            forward = forward / np.linalg.norm(forward)
+            up = np.array([0.0, 1.0, 0.0])
+            right = np.cross(forward, up)
+            right = right / np.linalg.norm(right)
+            true_up = np.cross(right, forward)
+
+            new_rotation = np.eye(4)
+            new_rotation[:3, 0] = right
+            new_rotation[:3, 1] = true_up
+            new_rotation[:3, 2] = -forward
+            new_rotation[:3, 3] = new_pos
+
+            scene.set_pose(camera_node, new_rotation)
 
         # Add lights
         light_nodes = create_raymond_lights()

@@ -286,7 +286,7 @@ def load_video_frames_from_video_file(
         
         # PMB if we're passing in the decord rather than the image stack
         vr = decord.VideoReader(video_path, width=image_size, height=image_size)
-        return vr, video_height, video_width 
+        return vr, int(video_height / 2), int(video_width / 2)
 
         # Iterate over all frames in the video
         #images = []

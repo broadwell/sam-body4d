@@ -12,7 +12,7 @@ visualizer = SkeletonVisualizer(line_width=2, radius=5)
 visualizer.set_pose_meta(mhr70_pose_info)
 
 
-def visualize_sample(img_cv2, outputs, faces, id_current):
+def visualize_sample(img_cv2, outputs, faces, id_current, side_view=False):
 	img_mesh = img_cv2.copy()
 	img_mesh = np.ones_like(img_mesh) * 255
 
@@ -28,6 +28,7 @@ def visualize_sample(img_cv2, outputs, faces, id_current):
 				person_output["pred_cam_t"],
 				img_mesh.copy(),
 			    # mesh_base_color=LIGHT_BLUE,
+                side_view=side_view,
 				mesh_base_color=color_list[id_current[pid]+6],
 				scene_bg_color=(1, 1, 1),
 			)
